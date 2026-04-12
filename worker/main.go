@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 
 	"database/sql"
 	"fmt"
@@ -28,6 +29,14 @@ const (
 	password = "okteto"
 	dbname   = "votes"
 )
+
+func getEnv(key string, fallback string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	return value
+}
 
 func main() {
 	db := openDatabase()
@@ -80,12 +89,31 @@ func main() {
 }
 
 func openDatabase() *sql.DB {
-	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+	dbHost := getEnv("POSTGRES_HOST", host)
+	dbPortStr := getEnv("POSTGRES_PORT", strconv.Itoa(port))
+	dbUser := getEnv("POSTGRES_USER", user)
+	dbPassword := getEnv("POSTGRES_PASSWORD", password)
+	dbName := getEnv("POSTGRES_DB", dbname)
+	dbSSLMode := getEnv("POSTGRES_SSLMODE", "require")
+
+	dbPort, err := strconv.Atoi(dbPortStr)
+	if err != nil {
+		log.Panicf("invalid POSTGRES_PORT value %q: %v", dbPortStr, err)
+	}
+
+	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", dbHost, dbPort, dbUser, dbPassword, dbName, dbSSLMode)
 	for {
 		db, err := sql.Open("postgres", psqlconn)
-		if err == nil {
-			return db
+		if err != nil {
+			log.Printf("postgres open error: %v", err)
+			continue
 		}
+		if err := db.Ping(); err != nil {
+			log.Printf("postgres ping error: %v", err)
+			_ = db.Close()
+			continue
+		}
+		return db
 	}
 }
 
@@ -103,7 +131,8 @@ func getKafkaMaster() sarama.Consumer {
 	kingpin.Parse()
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
-	brokers := *brokerList
+	kafkaHost := getEnv("KAFKA_HOST", (*brokerList)[0])
+	brokers := []string{kafkaHost}
 	fmt.Println("Waiting for kafka...")
 	for {
 		master, err := sarama.NewConsumer(brokers, config)
