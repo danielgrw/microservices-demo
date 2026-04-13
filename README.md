@@ -1,43 +1,46 @@
 # Microservices Demo
 
+Stick Martinez
+Daniel Gonzalez
+
 A demo application with Java, Go, Javascript, Kafka and PostgresQL.
 
 ## Architecture
 
 ![Architecture diagram](architecture.png)
 
-* A front-end web app in [Java](/vote) which lets you vote between Tacos and Burritos
-* A [Kafka](https://bitnami.com/stack/kafka/helm) queue which collects new votes
-* A [Golang](/worker) or worker which consumes votes from Kafka and stores them in PostgresQL
-* A [PostgresQL](https://bitnami.com/stack/postgresql/helm) database
-* A [Node.js](/result) webapp which shows the results of the voting in real time
+- A front-end web app in [Java](/vote) which lets you vote between Tacos and Burritos
+- A [Kafka](https://bitnami.com/stack/kafka/helm) queue which collects new votes
+- A [Golang](/worker) or worker which consumes votes from Kafka and stores them in PostgresQL
+- A [PostgresQL](https://bitnami.com/stack/postgresql/helm) database
+- A [Node.js](/result) webapp which shows the results of the voting in real time
 
 ## Run the demo application in Okteto
 
 ```
-$ git clone https://github.com/okteto/microservices-demo
-$ cd microservices-demo
-$ okteto login
-$ okteto deploy
+git clone https://github.com/okteto/microservices-demo
+cd microservices-demo
+okteto login
+okteto deploy
 ```
 
 ## Develop on the Result microservice
 
 ```
-$ okteto up result
+okteto up result
 ```
 
 ## Develop on the Vote microservice
 
 ```
-$ okteto up vote
+okteto up vote
 ```
 
 ## Develop on the Worker microservice
 
 ```
-$ okteto up worker
-$ make start
+okteto up worker
+make start
 ```
 
 ## Notes
