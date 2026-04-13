@@ -1,0 +1,67 @@
+name: CD Images
+
+on:
+  push:
+    branches: [staging, main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: voting-app
+
+jobs:
+  build-and-push-images:
+    name: Build and push service images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: tag
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            TAG="prod-${SHORT_SHA}"
+          else
+            TAG="staging-${SHORT_SHA}"
+          fi
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push images
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          SERVICES=(vote worker result)
+          : > image-tags.env
+          for service in "${SERVICES[@]}"; do
+            IMAGE_URI="${ECR_REGISTRY}/${PROJECT_NAME}/${service}:${IMAGE_TAG}"
+            docker build -t "${IMAGE_URI}" "./${service}"
+            docker push "${IMAGE_URI}"
+            echo "${service^^}_IMAGE=${IMAGE_URI}" >> image-tags.env
+          done
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> image-tags.env
+
+      - name: Upload image metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-tags-${{ github.ref_name }}-${{ github.sha }}
+          path: image-tags.env
+          if-no-files-found: error
+
